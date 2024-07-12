@@ -1,0 +1,73 @@
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+// UUIDs for the BLE services and characteristics
+#define SERVICE_UUID           "100f9420-9986-49c6-8d58-339c38304a07"
+#define CHARACTERISTIC_UUID_TEMP "e13605c5-612f-4105-bd80-3097815eacaa"
+#define CHARACTERISTIC_UUID_HUM  "7082750a-e721-4693-bba9-4632177578af"
+
+BLECharacteristic *pCharacteristicTemp;
+BLECharacteristic *pCharacteristicHum;
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Starting BLE work!");
+
+  // Initialize BLE
+  BLEDevice::init("ESP32_BLE");
+
+  // Create the BLE Server
+  BLEServer *pServer = BLEDevice::createServer();
+  
+  // Create the BLE Service
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  
+  // Create BLE Characteristics for Temperature and Humidity
+  pCharacteristicTemp = pService->createCharacteristic(
+                                          CHARACTERISTIC_UUID_TEMP,
+                                          BLECharacteristic::PROPERTY_READ |
+                                          BLECharacteristic::PROPERTY_NOTIFY
+                                        );
+
+  pCharacteristicHum = pService->createCharacteristic(
+                                          CHARACTERISTIC_UUID_HUM,
+                                          BLECharacteristic::PROPERTY_READ |
+                                          BLECharacteristic::PROPERTY_NOTIFY
+                                        );
+
+  // Create BLE Descriptors for the characteristics
+  pCharacteristicTemp->addDescriptor(new BLE2902());
+  pCharacteristicHum->addDescriptor(new BLE2902());
+
+  // Set initial values for the characteristics
+  pCharacteristicTemp->setValue("25.0"); // Initial temperature value
+  pCharacteristicHum->setValue("50.0");  // Initial humidity value
+  
+  // Start the service
+  pService->start();
+  
+  // Start advertising
+  pServer->getAdvertising()->start();
+  Serial.println("Waiting for a client connection...");
+}
+
+void loop() {
+  // Simulate temperature and humidity readings
+  static unsigned long lastUpdate = 0;
+  if (millis() - lastUpdate > 5000) { // Update every 5 seconds
+    lastUpdate = millis();
+    
+    float temperature = random(200, 300) / 10.0; // Simulate temperature value
+    float humidity = random(400, 600) / 10.0;    // Simulate humidity value
+    
+    Serial.printf("Temperature: %.1f °C, Humidity: %.1f %%\n", temperature, humidity);
+
+    // Update the characteristic values
+    pCharacteristicTemp->setValue(String(temperature).c_str());
+    pCharacteristicTemp->notify();
+    pCharacteristicHum->setValue(String(humidity).c_str());
+    pCharacteristicHum->notify();
+  }
+}
